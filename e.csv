@@ -1,0 +1,6 @@
+ID,Name,SuccessText,ErrorText,Help
+N1,External Internet,Able to reach the internet,Unable to access the internet,https://www.uclan.ac.uk
+N2,UCLan Network,Able to reach the UCLan Network,Unable to reach the UCLan Network,Contact LIS
+A1,AlwaysOn Connection,AlwaysOn connection has been established,AlwaysOn connection has not been established, Click the connect button under UCLan User (PoC) in your WiFi list.  You can access your WiFi list by selecting the WiFi icon in the system tray.
+T1,Account Type,Successfully contacted Active Directory,Unable to reach and/or determine Active Directory Account Type,Please contact LIS
+M1,Map X: Drive,Sucessfully mapped X: drive,Unable to map X: drive after 3 attempts,Please contact LIS customer support
