@@ -38,14 +38,15 @@ function PROC_ping($url){
 
 }
 
+function PROC_port_test($url, $port){
+    $net_test = Test-NetConnection -ComputerName $url -Port $port
+    return $net_test.TcpTestSucceeded
+}
+
 function PROC_check_adapter($name){
-    $adapter = Get-NetAdapter | where-object {$_.Name -like "*$name*"}
-    if($adapter.Status -eq "Up"){
-        return $true
-    }
-    else{
-        return $false
-    }
+    
+    return [bool]$(Get-VpnConnection | Where-Object {$_.Name -eq "$name" -and $_.ConnectionStatus -eq "Connected"})
+
 }
 
 function PROC_map_network_drive($letter, $path){
@@ -53,9 +54,11 @@ function PROC_map_network_drive($letter, $path){
     $check_count = 3
 
     while($check_count -ne 0){
-        if($(Test-Path -Path "$($letter)\")){
+        Write-Host $check_count
+        if($(Test-Path -Path "$($letter):\")){
 
             Write-Host "$path mapped to drive $($letter):"
+            $check_count = 0
             return $true
     
         }
@@ -70,6 +73,25 @@ function PROC_map_network_drive($letter, $path){
     }
 
     
+
+}
+
+function PROC_Check_Drive_Exist($letter){
+
+    if([bool]$(ls "$($letter):\" -ErrorAction SilentlyContinue)){
+
+        return $true
+
+    }
+    else{
+        return $false
+    }
+
+}
+
+function PROC_open_web($url){
+    
+    [System.Diagnostics.Process]::Start("$url")
 
 }
 

@@ -96,6 +96,7 @@ function GUI_generate_datatable($posX,$posY,$sizX,$sizY){
 
 function GUI_Change_Row_Colour($GUI_ROOT, $rowNo, $colour){
 
+    write-host $GUI_ROOT["DataTable"].Rows
     $GUI_ROOT["DataTable"].Rows[$rowNo].Cells | % {$_.Style.ForeColor="$colour"}
     
 
@@ -122,6 +123,11 @@ function GUI_update_grid($grid,$check,$status,$help){
 
 }
 
+function GUI_faux_loading(){
+
+    1..100 | % {Write-Progress -Activity "Loading UDT" -Status "$_ %" -id 1 -PercentComplete $_ }
+
+}
 
 function GUI_clear_grid($grid){
 
@@ -174,6 +180,11 @@ function GUI_Construct(){
     $root_form.Add("RecheckBtn", $(GUI_generate_button 945 120 150 45 "Re-Check" $($root_form["HeaderFont"])))
     $root_form["RecheckBtn"].BackColor = "LightGray"
     $root_form["RecheckBtn"].ForeColor = "Black"
+
+    # Help Button #
+    $root_form.Add("HelpButton", $(GUI_generate_button 1100 70 150 45 "Help" $($root_form["HeaderFont"])))
+    $root_form["HelpButton"].BackColor = "LightGray"
+    $root_form["HelpButton"].ForeColor = "Black"
 
     # Exit Button
     $root_form.Add("ExitBtn", $(GUI_generate_button 1100 120 150 45 "Exit" $($root_form["HeaderFont"])))
@@ -242,6 +253,8 @@ function GUI_Construct(){
     # UUID Version #
     $UUID = $(get-wmiobject Win32_ComputerSystemProduct  | Select-Object -ExpandProperty UUID)
     $root_form.Add("UUIDVersion", $(GUI_generate_label "$UUID" 605 110 $($root_form["BodyFont"])))
+
+
 
 
     # Don't try and append fonts, brushes, engines and rectangles... that would be silly
