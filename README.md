@@ -1,5 +1,2 @@
-# UDT2
-# BSc Digital & Technology Solutions
-
-Drive Tool 2.0
-MB
+# UDT 2.0
+# BSc (Hons) Digital & Technology Solutions
