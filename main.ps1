@@ -167,6 +167,15 @@ function M_Update_Status($GUI_ROOT, $message){
 
 }
 
+function M_check_pass_sequence($GUI_ROOT,$row_no,$next_status){
+
+    GUI_Change_Row_Colour $GUI_ROOT $row_no "Green"
+    GUI_update_form $GUI_ROOT["MainForm"]
+    M_Update_Status $GUI_ROOT "$next_status"
+    GUI_update_form $GUI_ROOT["MainForm"]
+
+}
+
 function M_Initiate_Checks($GUI_ROOT){
 
     $GUI_ROOT["StatusLabel"].ForeColor = "Black"
@@ -182,52 +191,28 @@ function M_Initiate_Checks($GUI_ROOT){
     GUI_update_form $GUI_ROOT["MainForm"]
 
     if($(M_External_Network_Checks $GUI_ROOT)[1] -eq $true){
-
-
-        GUI_Change_Row_Colour $GUI_ROOT 0 "Green"
-        GUI_update_form $GUI_ROOT["MainForm"]
-        M_Update_Status $GUI_ROOT "Checking Internet."
-        GUI_update_form $GUI_ROOT["MainForm"]
-
+        M_check_pass_sequence $GUI_ROOT 0 "Checking Internet."
         if($(M_Check_Adapter $GUI_ROOT)[1] -eq $true){
-
-            GUI_Change_Row_Colour $GUI_ROOT 1 "Green"
-            GUI_update_form $GUI_ROOT["MainForm"]
-            M_Update_Status $GUI_ROOT "Checking Domain."
-            GUI_update_form $GUI_ROOT["MainForm"]
-
+            M_check_pass_sequence $GUI_ROOT 1 "Checking Domain."
             if($(M_Internal_Network_Checks $GUI_ROOT)[1] -eq $true){
-
-                GUI_Change_Row_Colour $GUI_ROOT 2 "Green"
-                GUI_update_form $GUI_ROOT["MainForm"]
-                M_Update_Status $GUI_ROOT "Checking Active Directory"
-                GUI_update_form $GUI_ROOT["MainForm"]
-
-                if($(M_Get_Account_Type "$(PROC_return_username)" $GUI_ROOT)[1] -eq $true){
-                    
+                M_check_pass_sequence $GUI_ROOT 2 "Checking Active Directory"
+                if($(M_Get_Account_Type "$(PROC_return_username)" $GUI_ROOT)[1] -eq $true){                    
                     GUI_Change_Row_Colour $GUI_ROOT 3 "Green"
                     GUI_update_form $GUI_ROOT["MainForm"]
                     M_Configure_Hash $script:G_user_object.properties.extensionattribute1
-
                     # MAP DRIVES #
                     $table_row_position = 4
                     foreach($key in $($script:G_path_hash.keys)){
-
                         M_Update_Status $GUI_ROOT "Mapping $($key): drive"
-
                         if($(M_Map_Drive $GUI_ROOT "$key" "$($script:G_path_hash[$key])")){
-
                             GUI_Change_Row_Colour $GUI_ROOT $table_row_position "Green"
                             GUI_update_form $GUI_ROOT["MainForm"]
                         }
                         else{
-
                             M_Error_Triggered $GUI_ROOT
                             GUI_Change_Row_Colour $GUI_ROOT $table_row_position "Red"
-
                         }
                         $table_row_position++
-
                     }
                     $finished = $true
                 }
@@ -235,19 +220,16 @@ function M_Initiate_Checks($GUI_ROOT){
                     M_Error_Triggered $GUI_ROOT
                     GUI_Change_Row_Colour $GUI_ROOT 3 "Red"
                 }
-
             }
             else{
                 M_Error_Triggered $GUI_ROOT
                 GUI_Change_Row_Colour $GUI_ROOT 2 "Red"
             }
-
         }
         else{
             M_Error_Triggered $GUI_ROOT
             GUI_Change_Row_Colour $GUI_ROOT 1 "Red"
         }
-        
     }
     else{
         M_Error_Triggered $GUI_ROOT
@@ -259,7 +241,9 @@ function M_Initiate_Checks($GUI_ROOT){
         $GUI_ROOT["StatusLabel"].ForeColor = "Green"
         GUI_update_form $GUI_ROOT["MainForm"]
     }
-
+    else{
+        write-host "Exited with errors..."
+    }
 }
 
 function main($switch){

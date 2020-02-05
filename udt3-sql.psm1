@@ -37,42 +37,25 @@ function execute_sql_command($connection_object, $sql_cmd){
 
 }
 
-function get_session_date(){
+function build_sql_command($runStatus,$errorCode,$osVersion,$modelNo,$macAddress,$UUID){
 
-    $timecode = Get-Content "$env:SystemDrive\uclan\local_admin_tool\t.dat"
-    $date_object = [datetime]::ParseExact($timecode, 'yyyyMMddHHmm', $null)
-    return $date_object
-
-}
-
-function session_counter(){
-
-    if(test-path "$PSScriptRoot\resources\c.dat"){
-
-        [int]$counter = Get-Content "$PSScriptRoot\resources\c.dat"
-        $counter++;
-        Set-Content "$PSScriptRoot\resources\c.dat" $counter -Force
-
-    }
-    else{
-
-        [int]$counter = 1
-        Set-Content "$PSScriptRoot\resources\c.dat" $counter -Force
-
-    }
-
-    return $counter
+    $hostName = $env:COMPUTERNAME
+    $userName = $env:USERNAME
+    $date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $sql_command = "INSERT INTO UclanDriveTool (hostName, userName, runStatus, errorCode, date, osVersion, modelNo, macAddress, UUID) VALUES ('$env:USERNAME','$env:COMPUTERNAME','$current_date','$end_date','$counter');"
+    return $sql_command
 
 }
 
-if(test-connection $sql_server -Count 2 -Quiet){
+
+if(test-connection $sql_server -Count 1 -Quiet){
 
     $s_creds = return_readonly_sql_credentials
     $connection_obj = create_connection_object $s_creds
     $current_date = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $end_date = get_session_date
     $counter = session_counter
-    execute_sql_command $connection_obj "INSERT INTO AdminLog (username, hostname, startDate, endDate, requestCount) VALUES ('$env:USERNAME','$env:COMPUTERNAME','$current_date','$end_date','$counter');"
+    execute_sql_command $connection_obj "INSERT INTO UclanDriveTool (hostName, userName, runStatus, errorCode, date, osVersion, modelNo, macAddress, UUID) VALUES ('$env:USERNAME','$env:COMPUTERNAME','$current_date','$end_date','$counter');"
 
 }
 else{
