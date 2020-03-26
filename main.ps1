@@ -1,293 +1,419 @@
-## UCLan Drive Tool 3 - University of Central Lancashire ##
-##                                                       ##
-## Author : M Bradley 2020                               ##
+######################################
+#                                    #
+#    UCLan Drive Tool 2.0            #
+#                                    #
+#    2.0.0.2 - Michael Bradley       #
+#                                    #
+######################################
 
-# Load Modules #
-Import-Module "$PSScriptRoot\udt3-gui.psm1" -Force
-Import-Module "$PSScriptRoot\udt3-proc.psm1" -Force
-Import-Module "$PSScriptRoot\udt3-evnt.psm1" -Force
+# Description: This is a re-write of UCLan Drive Tool 1 created by Gareth Edwards.
+#              Its main purpose is to check network services and drives are functioning as intended
+#              for UCLan Enterprise mobility devices.
+#
+#              All operations within this codebase operate in the user context.
 
-# Begin Functions #
+# Silent Process Checker #
 
-# Load Frameworks #
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
-Add-Type -AssemblyName PresentationFramework
-
-# Global Path Hash #
-$G_path_hash = @{}
-
-# Global Directory Object #
-$G_user_object
-
-function M_Configure_Hash($type){
-
-    if($G_user_object.properties.extensionattribute1 -eq "staff"){
-        $script:G_path_hash.Add("N", "$($G_user_object.properties.homedirectory)")
-        $script:G_path_hash.Add("S", "\\LSA-001\Share")
-        $script:G_path_hash.Add("T", "\\LSA-002\Share")
-        $script:G_path_hash.Add("U", "\\LSA-003\Share")
-        $script:G_path_hash.Add("W", "\\LSA-201\Share")
-        $script:G_path_hash.Add("Q", "\\ntds.uclan.ac.uk\Apps")
-    }
-    else{
-
-        write-host "Hash not configured"
-    }
+# Kill the silent process if it is running
+$silentDetector = Get-WmiObject Win32_Process -Filter "Name='powershell.exe' AND CommandLine LIKE '%UDT2\\mainS.ps1%'"
+if([bool]$($silentDetector)){
+	$silentDetector.Terminate()
 }
 
-function M_Start_Graphics($GUI_ROOT){
+# Load WPF Frameworks
+Add-Type -AssemblyName PresentationFramework, PresentationCore
 
-    Write-Output $GUI_ROOT
-    # Initialise Graphics #
-    $GUI_ROOT["GraphicsEngine"] = $GUI_ROOT["MainForm"].createGraphics()
-    # Apply a fresh coat of paint #
-    $GUI_ROOT["MainForm"].Add_Paint({
-        $GUI_ROOT["GraphicsEngine"].FillRectangle($GUI_ROOT["BrushObject"], $GUI_ROOT["RectObject"])
-    })
-    # Invoke #
-    $GUI_ROOT["MainForm"].ShowDialog()
+# Load Console Definitions
+Add-Type -Name Window -Namespace Console -MemberDefinition '
+[DllImport("Kernel32.dll")]
+public static extern IntPtr GetConsoleWindow();
 
+[DllImport("user32.dll")]
+public static extern bool ShowWindow(IntPtr hWnd, Int32 nCmdShow);
+'
+
+# Hide the console
+$consolePtr = [Console.Window]::GetConsoleWindow()
+[Console.Window]::ShowWindow($consolePtr, 0)
+
+# Store working directory
+$script:RootFolder = $PSScriptRoot
+
+# Load Loading Animation dll
+[System.Reflection.Assembly]::LoadFrom("$PSScriptRoot\LoadingIndicators.WPF.dll") | out-null
+
+# Master synced hashtable for UI
+$script:hRoot = [hashtable]::Synchronized(@{})
+
+# Hashtable Check Variables
+$script:checkVars = [hashtable]::Synchronized(@{})
+$script:checkVars.Add("ExtUrl", "1.1.1.1")
+$script:checkVars.Add("userTunnel", "UCLan Network")
+$script:checkVars.Add("domainName", "ntds.uclan.ac.uk")
+
+# Hashtable Text Responses
+$script:statusText = [hashtable]::Synchronized(@{})
+$script:statusText.Add("S1", "All services connected and ready for use.")
+$script:StatusText.Add("VE1", "VPN Error: could not establish user tunnel connection.")
+$script:StatusText.Add("VE2", "VPN Error: could not connect to VPN.")
+$script:StatusText.Add("VE3", "UCLan Ethernet connection, bypassing VPN check.")
+
+# Drive maps share paths
+$script:sharePaths = [hashtable]::Synchronized(@{})
+$script:sharePaths.Add("N", "default")
+$script:sharePaths.Add("S", "\\LSA-001\Share")
+$script:sharePaths.Add("T", "\\LSA-002\Share")
+$script:sharePaths.Add("U", "\\LSA-003\Share")
+$script:sharePaths.Add("W", "\\LSA-201\Share")
+$script:sharePaths.Add("Q", "\\ntds.uclan.ac.uk\Apps")
+
+
+# Hashtable for external elements
+$script:extResources = [hashtable]::Synchronized(@{})
+$script:extResources.Add("ErrorImg", "$RootFolder\error.png")
+
+# Create a runspace and initialise it with the core hashtables
+function createRunspace(){
+
+    $rSpace = [runspacefactory]::CreateRunspace()
+    $powerShell = [powershell]::Create()
+    $powerShell.runspace = $rSpace
+    $rSpace.Open()
+    $rSpace.SessionStateProxy.SetVariable("hRoot", $script:hRoot)
+    $rSpace.SessionStateProxy.SetVariable("statusText", $script:statusText)
+    $rSpace.SessionStateProxy.SetVariable("checkVars", $script:checkVars)
+    $rSpace.SessionStateProxy.SetVariable("extResources", $script:extResources)
+    $rSpace.SessionStateProxy.SetVariable("sharePaths", $script:sharePaths)
+
+    # Load the working directory
+    $rSpace.SessionStateProxy.SetVariable("RootFolder", $script:RootFolder)
+    return $powerShell
 }
 
-function M_External_Network_Checks($GUI_ROOT){
+function getOS(){
+    $build = $((Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' -Name ReleaseId).ReleaseId)
+    $OS = $(get-wmiobject -class win32_operatingsystem | select-object -ExpandProperty caption) -replace "Microsoft ", ""
+    return "$OS $build"
+}
 
-    #External Check
-    $event_ID = "N1"
+function setMachineInfo(){
     
-    if(PROC_port_test "www.google.co.uk" 80){
-        $status = EVENT_Status_Return_Array $false $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "Success!"
-        return $true
-    }
-    else{
-        $status = EVENT_Status_Return_Array $true $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "$($status[2])"
-        return $false
-    }
-
-}
-
-function M_Internal_Network_Checks($GUI_ROOT){
-
-    #Internal Check
-    $event_ID = "N2"
-    if(PROC_ping "ntds.uclan.ac.uk"){
-        $status = EVENT_Status_Return_Array $false $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "Success!"
-        return $true
-    }
-    else{
-        $status = EVENT_Status_Return_Array $true $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "$($status[2])"
-        return $false
-    }
-
-}
-
-function M_Check_Adapter($GUI_ROOT){
-    [int]$validate = 0
-    $event_ID = "A1"
-    if(PROC_check_adapter "UCLan Network"){
-        $status = EVENT_Status_Return_Array $false $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "Success!"
-        $validate = 0
-        return $true
-    }
-    else{
-        $status = EVENT_Status_Return_Array $true $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "$($status[2])"
-        $validate = 1
-        return $false
+    $csProduct = Get-Wmiobject -class win32_computersystemproduct
+    $script:hRoot.UsrVal.Content = $(Get-WmiObject -class win32_computersystem).UserName.Split('\')[1]
+    $script:hRoot.CompVal.Content = $csProduct.PSComputerName
+    $script:hRoot.OSVal.Content = $(getOS)
+    $script:hRoot.UUIDVal.Content = $csProduct | select -ExpandProperty UUID -First 1
+    $script:hRoot.MACVal.Content = $(Get-WmiObject -Class win32_networkadapterconfiguration | where-object {$null -ne $_.ipaddress} | select -expandproperty macaddress -First 1)
+    if($($script:hRoot.MACVal.Content).length -eq 0){
+        $script:hRoot.MACVal.Content = "No active interface."
     }
 }
 
-function M_Get_Account_Type($username, $GUI_ROOT){
+function setDefault(){
 
-    $event_ID = "T1"
-    $user_object = PROC_Return_Account_Obj "$username"
-    #$user_object = "Academic"
-    if($null -eq $user_object){
-        Write-Host "Status is empty"
-        $status = EVENT_Status_Return_Array $true $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "$($status[2])"
-        return $false
-    }
-    else{
-        Write-Host "Status is there"
-        $script:G_user_object = $user_object
-        $status = EVENT_Status_Return_Array $false $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1])" "Type: $($user_object.properties.extensionattribute1)"
-        return $true
-    }
+    # Set Icon
+    $script:hRoot.Window.Icon = "$PSSCriptRoot\icon.ico"
 
+    # Set Window Location
+    $script:hRoot.Window.WindowStartupLocation = "CenterScreen"
+
+    # Set Image Sources
+    $script:hRoot.Section1Img.Source = "$PSScriptRoot\tick.png"
+    $script:hRoot.Section2Img.Source = "$PSScriptRoot\tick.png"
+    $script:hRoot.Section3Img.Source = "$PSScriptRoot\tick.png"
+    $script:hRoot.ULogo.Source = "$PSScriptRoot\logo.png"
+
+    # Set Image Default Visibility
+    $script:hRoot.Section1Img.Visibility = "Hidden"
+    $script:hRoot.Section2Img.Visibility = "Hidden"
+    $script:hRoot.Section3Img.Visibility = "Hidden"
+
+    # Progress Default Positions
+    $script:hRoot.ArcsStyle1.Margin = "-373,-106,0,0"
+    $script:hRoot.ArcsStyle2.Margin = "452,-106,0,0"
+    $script:hRoot.ArcsStyle3.Margin = "10,-106,0,0"
+
+    # Progress Default Visibility
+    $script:hRoot.ArcsStyle1.Visibility = "Hidden"
+    $script:hRoot.ArcsStyle2.Visibility = "Hidden"
+    $script:hRoot.ArcsStyle3.Visibility = "Hidden"
 }
 
-function M_Map_Drive($GUI_ROOT, $letter, $path){
+function runChecks($flag){
+    $powerShell = createRunspace
 
-    $event_ID = "M1"
+    [void]$powerShell.AddScript({
 
-    if($(PROC_Check_Drive_Exist $letter)){
+        # Import Check Module #
+        Import-Module "$RootFolder\checks.psm1" -Force
 
-        $status = EVENT_Status_Return_Array $false $event_ID
-        GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0]) $($letter):" "$($status[1]) $($letter): ($($script:G_path_hash[$letter]))" "Drive $($letter): already mapped."
-        
-    }
-    else{
+        # Silent Check #
 
-        if($(PROC_map_network_drive $letter $path)){
-            $status = EVENT_Status_Return_Array $false $event_ID
-            GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0]) $($letter):" "$($status[1]) $($letter): ($($script:G_path_hash[$letter])" "Successfully mapped $($letter): drive!"
+        # MapType Flag
+        $script:MapType = 0
+
+        # AD Objecg #
+        $script:userObj = $null
+
+        function setStatus($text){
+            $script:hRoot.RLabel.Dispatcher.Invoke([action]{
+                $script:hRoot.RLabel.Content = $text
+            })
+        }
+
+        function changeIMG($img, $path){
+            $script:hRoot["$img"].Dispatcher.Invoke([action]{
+                $script:hRoot["$img"].Source = $path
+            })
+        }
+
+        function toggleVisible($element){
+            if($script:hRoot["$element"].Visibility -eq "Visible"){
+                $script:hRoot["$element"].Dispatcher.Invoke([action]{
+                    $script:hRoot["$element"].Visibility = "Hidden"
+                })
+            }
+            else{
+                $script:hRoot["$element"].Dispatcher.Invoke([action]{
+                    $script:hRoot["$element"].Visibility = "Visible"
+                })
+            }
+        }
+
+        function criticalFailure($phase){
+            for($i = $phase;$i -lt 4;$i++){
+                if($i -le $phase){
+                    $arcName = -join("ArcsStyle","$i")
+                    toggleVisible $arcName
+                }
+                $imgName = -join("Section","$i","Img")
+                changeIMG $imgName $script:extResources.ErrorImg
+                toggleVisible $imgName
+            }
+        }
+
+        function phaseOne(){
+            # PHASE 1 - Check Internet
+
+            # Activate Loading Icon
+            toggleVisible "ArcsStyle1"
+
+            # External check URL
+
+            # Update Status
+            setStatus "Checking Internet..."
+            if($(pingThis $script:checkVars.ExtUrl) -or $(testPort $script:checkVars.ExtUrl 80)){
+                $null
+            }
+            else{
+                # Both internet checks failed, terminate runspace
+                setStatus "You have no internet connection.  Please check your Wireless or docked connection."
+                return $false
+            }
+
+            # Checks passed! #
+            toggleVisible "ArcsStyle1"
+            toggleVisible "Section1Img"
             return $true
         }
-        else{
-            $status = EVENT_Status_Return_Array $true $event_ID
-            GUI_update_grid $GUI_ROOT["DataTable"] "$($status[0])" "$($status[1]) $letter" "$($status[2])"
-            return $false
-        }
 
-    }
+        function phaseTwo(){
+            # PHASE 2 - Check UCLan Services
 
-}
+            # Activate Loading Icon
+            toggleVisible "ArcsStyle2"
+            setStatus "Checking UCLan Services..."
 
-function M_Error_Triggered($GUI_ROOT){
-    
-    GUI_update_form $GUI_ROOT["MainForm"]
-    GUI_change_element_text $GUI_ROOT["StatusLabel"] "Error - see below."
-    $GUI_ROOT["StatusLabel"].ForeColor = "Red"
-    GUI_update_form $GUI_ROOT["MainForm"]
 
-}
+            ## VPN Checks ##
 
-function M_Update_Status($GUI_ROOT, $message){
+            # Check/Set SSTP VPN Strategy #
+            vpnStrategy 5
 
-    GUI_update_form $GUI_ROOT["MainForm"]
-    GUI_change_element_text $GUI_ROOT["StatusLabel"] "$message"
-    GUI_update_form $GUI_ROOT["MainForm"]    
-
-}
-
-function M_check_pass_sequence($GUI_ROOT,$row_no,$next_status){
-
-    GUI_Change_Row_Colour $GUI_ROOT $row_no "Green"
-    GUI_update_form $GUI_ROOT["MainForm"]
-    M_Update_Status $GUI_ROOT "$next_status"
-    GUI_update_form $GUI_ROOT["MainForm"]
-
-}
-
-function M_Initiate_Checks($GUI_ROOT){
-
-    $GUI_ROOT["StatusLabel"].ForeColor = "Black"
-    $finished = $false
-    GUI_clear_grid($GUI_ROOT)
-
-    # Change status to running #
-    M_Update_Status $GUI_ROOT "Performing tasks..."
-
-    ## BEGIN CHECKS SEQUENCE ##
-
-    M_Update_Status $GUI_ROOT "Checking AlwaysOn."
-    GUI_update_form $GUI_ROOT["MainForm"]
-
-    if($(M_External_Network_Checks $GUI_ROOT)[1] -eq $true){
-        M_check_pass_sequence $GUI_ROOT 0 "Checking Internet."
-        if($(M_Check_Adapter $GUI_ROOT)[1] -eq $true){
-            M_check_pass_sequence $GUI_ROOT 1 "Checking Domain."
-            if($(M_Internal_Network_Checks $GUI_ROOT)[1] -eq $true){
-                M_check_pass_sequence $GUI_ROOT 2 "Checking Active Directory"
-                if($(M_Get_Account_Type "$(PROC_return_username)" $GUI_ROOT)[1] -eq $true){                    
-                    GUI_Change_Row_Colour $GUI_ROOT 3 "Green"
-                    GUI_update_form $GUI_ROOT["MainForm"]
-                    M_Configure_Hash $script:G_user_object.properties.extensionattribute1
-                    # MAP DRIVES #
-                    $table_row_position = 4
-                    foreach($key in $($script:G_path_hash.keys)){
-                        M_Update_Status $GUI_ROOT "Mapping $($key): drive"
-                        if($(M_Map_Drive $GUI_ROOT "$key" "$($script:G_path_hash[$key])")){
-                            GUI_Change_Row_Colour $GUI_ROOT $table_row_position "Green"
-                            GUI_update_form $GUI_ROOT["MainForm"]
-                        }
-                        else{
-                            M_Error_Triggered $GUI_ROOT
-                            GUI_Change_Row_Colour $GUI_ROOT $table_row_position "Red"
-                        }
-                        $table_row_position++
+            if($(vpnConnected $script:checkVars.userTunnel)){
+                # Continue | reserved for logging
+                $null
+            }
+            elseif($(vpnBypass $script:checkVars.domainName)){
+                # Continue | reserved for logging
+                $null
+            }
+            elseif($(vpnInactive $script:checkVars.userTunnel)){
+                $nowTime = Get-Date
+                $failed = while($(vpnConnected $script:checkVars.userTunnel) -eq $false){
+                    if($(vpnDisconnected $script:checkVars.userTunnel)){
+                        rasdial.exe "$($script:checkVars.userTunnel)"
                     }
-                    $finished = $true
+
+                    if($(Get-Date) -gt $nowTime.AddMinutes(1)){                    
+                        return $false
+                    }
+
+                    Start-Sleep 1
                 }
-                else{
-                    M_Error_Triggered $GUI_ROOT
-                    GUI_Change_Row_Colour $GUI_ROOT 3 "Red"
+
+                if($failed -eq $false){
+                    return $false
                 }
             }
             else{
-                M_Error_Triggered $GUI_ROOT
-                GUI_Change_Row_Colour $GUI_ROOT 2 "Red"
+                setStatus $script:StatusText.VE2
+                return $false
+            }
+
+            ## VPN Checks End ##
+
+            ## Internal Network Checks ##
+            if(-not(pingThis $script:checkVars.domainName)){
+                return $false
+            }
+
+            $script:userObj = getADUser $env:USERNAME
+
+            if($null -eq $script:userObj){
+                setStatus "Failed to see AD"
+                return $false
+            }
+            else{
+                $script:MapType = getAccType $userObj
+            }
+
+            if($null -eq $script:MapType){
+                setStatus "No type defined"
+                return $false
+            }
+
+
+            # Checks passed! #
+            toggleVisible "ArcsStyle2"
+            toggleVisible "Section2Img"
+            return $true
+        }
+
+        function phaseThree(){
+
+            # Network Drives! #
+            toggleVisible "ArcsStyle3"
+            setStatus "Checking network drives..."
+
+            $script:sharePaths.N = $script:userObj.properties.homedirectory
+            
+            if($script:MapType -eq 2){
+                $memStore = $script:sharePaths.T
+                $script:sharePaths.T = $script:sharePaths.S
+                $script:sharePaths.S = $memStore
+            }
+
+            if($null -eq $script:MapType){
+                if($(mapDrive "N" "$($script:sharePaths.N)") -eq $false){
+                    setStatus "Could not map $key drive."
+                    return $false
+                }
+            }
+            else{
+                foreach($key in $script:sharePaths.Keys){
+                    if($(mapDrive $key $script:sharePaths["$key"]) -eq $false){
+                    setStatus "Could not map $key drive."
+                    return $false
+                    }
+                }
+            }
+
+            # Checks complete! #
+            toggleVisible "ArcsStyle3"
+            toggleVisible "Section3Img"
+            return $true
+        }
+
+        function main(){
+            # Disable Check Button / Prevents multiple function calls #
+            toggleVisible "CheckBtn"
+            if($(phaseOne) -eq $true){
+                if($(phaseTwo) -eq $true){
+                    if($(phaseThree) -eq $true){
+                        setStatus "$($script:StatusText.S1)"
+                        toggleVisible "CheckBtn"
+                    }
+                    else{
+                        toggleVisible "CheckBtn"
+                        criticalFailure 3
+                        exit 0
+                    }
+                }
+                else{
+                    toggleVisible "CheckBtn"
+                    criticalFailure 2
+                    exit 0
+                }
+            }
+            else{
+                toggleVisible "CheckBtn"
+                criticalFailure 1
+                exit 0
             }
         }
-        else{
-            M_Error_Triggered $GUI_ROOT
-            GUI_Change_Row_Colour $GUI_ROOT 1 "Red"
-        }
-    }
-    else{
-        M_Error_Triggered $GUI_ROOT
-        GUI_Change_Row_Colour $GUI_ROOT 0 "Red"
-    }
 
-    if($finished -eq $true){
-        M_Update_Status $GUI_ROOT "Complete!"
-        $GUI_ROOT["StatusLabel"].ForeColor = "Green"
-        GUI_update_form $GUI_ROOT["MainForm"]
-    }
-    else{
-        write-host "Exited with errors..."
-    }
+        # Runspace Entry 
+        main
+
+    })
+    $job = $powerShell.BeginInvoke()
 }
 
-function main($switch){
+function main($argValue){
 
-    if($switch -ne "silent"){
+    # Load GUI
+    [xml]$XAML = Get-Content "$PSScriptroot\gui.xml"
+    $xamlReader = $(New-Object System.Xml.XmlNodeReader $XAML)
+    try{
+        $script:hRoot.Add("Window",$([Windows.Markup.XamlReader]::Load($xamlReader)))
+        $XAML.SelectNodes("//*[@Name]") | % {$script:hRoot.Add($_.Name, $script:hRoot.Window.FindName($_.Name))}
+    }
+    catch{
+        write-host "Failed to parse/build hashtable error below:"
+        $_.Exception
+        exit 1
+    }
 
-        #GUI_faux_loading
-        # Activate the Graphics Engine #
-        $GUI_ROOT = GUI_Construct
-        
-        # Trigger on Button Press
-        $GUI_ROOT["RecheckBtn"].add_Click({
-            $script:G_user_object = $null
-            $script:G_path_hash = @{}
-            M_Initiate_Checks $GUI_ROOT
+    # Set Element Defaults
+    setDefault
+
+    # Set Machine Info
+    setMachineInfo
+
+    # Switch case
+    if($argValue -ne "silent"){
+
+        $script:hRoot.Window.add_ContentRendered({
+            
+            runChecks
         })
 
-        # Auto Trigger when launched
-        $GUI_ROOT["MainForm"].add_Shown({
-
-            #GUI_Hide_Console
-            M_Initiate_Checks $GUI_ROOT
-
+        $script:hRoot.CheckBtn.add_Click({
+            setDefault
+            runChecks
         })
 
-        $GUI_ROOT["HelpButton"].add_Click({
-            PROC_open_web "https://uclan.topdesk.net/tas/public/ssp"
+        $script:hRoot.ExitBtn.add_Click({
+            $script:hRoot.Window.Close()
         })
 
-        M_Start_Graphics $GUI_ROOT
-        
-        
+        $script:hRoot.HelpBtn.add_Click({
+            [System.Diagnostics.Process]::Start("https://uclan.topdesk.net/tas/public/ssp")
+        })
+
+        # Initiate graphics engine
+        $script:hRoot.Window.ShowDialog()
+
     }
     else{
 
-        $GUI_ROOT = GUI_Construct
-        M_Initiate_Checks $GUI_ROOT
+        exit 0
 
     }
 
+    exit 0
 }
 
-
-# End Functions #
-
-# # Entry Point # #
+# Entry Point #
 main $args[0]

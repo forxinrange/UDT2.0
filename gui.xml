@@ -1,0 +1,81 @@
+<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:loadin="clr-namespace:LoadingIndicators.WPF;assembly=LoadingIndicators.WPF"
+        Title="UCLan Drive Tool 2.0" Height="600" Width="1280" ResizeMode="NoResize" Background="White">
+
+        <Window.Resources>
+            <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Styles/LoadingWave.xaml"/>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Styles/LoadingThreeDots.xaml"/>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Styles/LoadingFlipPlane.xaml"/>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Styles/LoadingPulse.xaml"/>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Styles/LoadingDoubleBounce.xaml"/>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Colors.xaml"/>
+            <ResourceDictionary Source="pack://application:,,,/LoadingIndicators.WPF;component/Styles.xaml"/>    
+            </ResourceDictionary.MergedDictionaries>
+            </ResourceDictionary>
+        </Window.Resources>
+    
+        
+    <Grid>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition/>
+            <ColumnDefinition/>
+        </Grid.ColumnDefinitions>
+        <Rectangle Name="BtmPanel" Fill="#FFE4E4E4" HorizontalAlignment="Left" Height="440" Margin="-3,136,-2.4,-1.6" VerticalAlignment="Top" Width="1280" Grid.ColumnSpan="2"/>
+        <Image Name="ULogo" HorizontalAlignment="Left" Height="120" VerticalAlignment="Top" Width="353" Margin="48,10,0,0"/>
+        <loadin:LoadingIndicator Name="ArcsStyle1" SpeedRatio="1" IsActive="True" Style="{DynamicResource LoadingIndicatorArcsStyle}">
+            <loadin:LoadingIndicator.RenderTransform>
+                <ScaleTransform ScaleX="5.5" ScaleY="5.5"/>
+            </loadin:LoadingIndicator.RenderTransform>
+        </loadin:LoadingIndicator>
+        <loadin:LoadingIndicator Name="ArcsStyle2" SpeedRatio="1" IsActive="True" Style="{DynamicResource LoadingIndicatorArcsStyle}" Grid.Column="0">
+            <loadin:LoadingIndicator.RenderTransform>
+                <ScaleTransform ScaleX="5.5" ScaleY="5.5"/>
+            </loadin:LoadingIndicator.RenderTransform>
+        </loadin:LoadingIndicator>
+        <loadin:LoadingIndicator Name="ArcsStyle3" SpeedRatio="1" IsActive="True" Style="{DynamicResource LoadingIndicatorArcsStyle}" Grid.Column="1">
+            <loadin:LoadingIndicator.RenderTransform>
+                <ScaleTransform ScaleX="5.5" ScaleY="5.5"/>
+            </loadin:LoadingIndicator.RenderTransform>
+        </loadin:LoadingIndicator>
+        <Image Name="Section1Img" HorizontalAlignment="Left" Height="323" Margin="35,180,0,0" VerticalAlignment="Top" Width="400">
+            <Image.RenderTransform>
+                <ScaleTransform ScaleX="0.90" ScaleY="0.90"/>
+            </Image.RenderTransform>
+        </Image>
+        <Image Name="Section2Img" HorizontalAlignment="Left" Height="323" Margin="448,180,0,0" VerticalAlignment="Top" Width="400" Grid.ColumnSpan="2">
+            <Image.RenderTransform>
+                <ScaleTransform ScaleX="0.90" ScaleY="0.90"/>
+            </Image.RenderTransform>
+        </Image>
+        <Image Name="Section3Img" HorizontalAlignment="Left" Height="323" Margin="227.2,180,0,0" VerticalAlignment="Top" Width="400" Grid.Column="1">
+            <Image.RenderTransform>
+                <ScaleTransform ScaleX="0.90" ScaleY="0.90"/>
+            </Image.RenderTransform>
+        </Image>
+        <Label Name="RLabel" Content="Ready" HorizontalAlignment="Left" Margin="5,526,0,0" VerticalAlignment="Top" Height="34" Width="1254" Grid.ColumnSpan="2" Foreground="Black" BorderBrush="Black" BorderThickness="1" FontSize="16" Background="White"/>
+        <Label Name="NLabel" Content="1. Internet Connection" HorizontalAlignment="Left" Margin="10,470,0,0" VerticalAlignment="Top" Height="38" Width="400" Foreground="Black" BorderThickness="1" FontSize="20" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        <Label Name="VLabel" Content="2. UCLan Services" HorizontalAlignment="Left" Margin="433,470,0,0" VerticalAlignment="Top" Height="38" Width="400" Foreground="Black" BorderThickness="1" FontSize="20" Grid.ColumnSpan="2" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"/>
+        <Label Name="DLabel" Content="3. Network Drives" HorizontalAlignment="Left" Margin="217.2,470,0,0" VerticalAlignment="Top" Height="38" Width="400" Foreground="Black" BorderThickness="1" Grid.Column="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="20"/>
+        <Button Name="ExitBtn" Content="Exit" Grid.Column="1" HorizontalAlignment="Left" Margin="461.2,77,0,0" VerticalAlignment="Top" Width="166" Height="46" Background="#FFE5E5E5" BorderBrush="Black" BorderThickness="2" FontWeight="Bold" FontSize="20"/>
+        <Button Name="CheckBtn" Content="Re-Check" Grid.Column="1" HorizontalAlignment="Left" Margin="290.2,77,0,0" VerticalAlignment="Top" Width="166" Height="46" Background="#FFE5E5E5" BorderBrush="Black" BorderThickness="2" FontWeight="Bold" FontSize="20"/>
+        <Button Name="HelpBtn" Content="Help" Grid.Column="1" HorizontalAlignment="Left" Margin="461.2,26,0,0" VerticalAlignment="Top" Width="166" Height="46" Background="#FFE5E5E5" BorderBrush="Black" BorderThickness="2" FontWeight="Bold" FontSize="20"/>
+        <Label Name="UsrLabel" Content="Username:" HorizontalAlignment="Left" Margin="379,3,0,0" VerticalAlignment="Top" Width="132" HorizontalContentAlignment="Right" FontWeight="Bold" FontSize="13"/>
+        <Label Name="CmpLabel" Content="Computer Name:" HorizontalAlignment="Left" Margin="379,29,0,0" VerticalAlignment="Top" Width="132" HorizontalContentAlignment="Right" FontWeight="Bold" FontSize="13"/>
+        <Label Name="OSLabel" Content="Operating System:" HorizontalAlignment="Left" Margin="379,55,0,0" VerticalAlignment="Top" Width="132" HorizontalContentAlignment="Right" FontWeight="Bold" FontSize="13"/>
+        <Label Name="UUIDLabel" Content="UUID:" HorizontalAlignment="Left" Margin="379,81,0,0" VerticalAlignment="Top" Width="132" HorizontalContentAlignment="Right" FontWeight="Bold" FontSize="13"/>
+        <Label Name="MacLabel" Content="Mac Address:" HorizontalAlignment="Left" Margin="379,105,0,0" VerticalAlignment="Top" Width="132" HorizontalContentAlignment="Right" FontWeight="Bold" FontSize="13"/>
+        <Label Name="UsrVal" Content="" HorizontalAlignment="Left" Margin="516,3,0,0" VerticalAlignment="Top" Width="300" FontSize="13" Grid.ColumnSpan="2"/>
+        <Label Name="CompVal" Content="" HorizontalAlignment="Left" Margin="516,29,0,0" VerticalAlignment="Top" Width="300" FontSize="13" Grid.ColumnSpan="2"/>
+        <Label Name="OSVal" Content="" HorizontalAlignment="Left" Margin="516,55,0,0" VerticalAlignment="Top" Width="300" FontSize="13" Grid.ColumnSpan="2"/>
+        <Label Name="UUIDVal" Content="" HorizontalAlignment="Left" Margin="516,81,0,0" VerticalAlignment="Top" Width="300" FontSize="13" Grid.ColumnSpan="2"/>
+        <Label Name="MacVal" Content="" HorizontalAlignment="Left" Margin="516,105,0,0" VerticalAlignment="Top" Width="300" FontSize="13" Grid.ColumnSpan="2"/>
+
+    </Grid>
+</Window>
